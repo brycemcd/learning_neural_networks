@@ -9,10 +9,12 @@ ModelMessageConsumer().listen()
 Make models in 2017-11-23-model-creator. Executing that notebook will publish a
 model to the model publishing queue
 """
+
 import json
 import datetime
 import h5py
 import keras
+import socket
 
 from kafka import KafkaConsumer
 from kafka import KafkaProducer
@@ -46,18 +48,18 @@ class ModelCompletePublisher:
     
 class ModelMessageConsumer:
     "Listens to a message queue for new models being published"
-    
-    # To consume latest messages and auto-commit offsets
-    consumer = KafkaConsumer('test-models',
-                             group_id='test-group-001',
-                             bootstrap_servers=['spark4.thedevranch.net'],
-                             #value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                             auto_offset_reset='latest',
-                             enable_auto_commit=False,
-                            )
 
     def listen(self):
-        for message in self.consumer:
+        # To consume latest messages and auto-commit offsets
+        consumer = KafkaConsumer('test-models',
+                                 group_id='test-group-001',
+                                 client_id=socket.gethostname()
+                                 bootstrap_servers=['spark4.thedevranch.net'],
+                                 #value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+                                 auto_offset_reset='latest',
+                                 enable_auto_commit=False,
+                                )
+        for message in consumer:
             # message value and key are raw bytes -- decode if necessary!
             # e.g., for unicode: `message.value.decode('utf-8')`
             print("%s:%d:%d: key=%s" % (message.topic, message.partition,
@@ -87,7 +89,7 @@ class ModelExecutor(ModelCompletePublisher):
                       **training_hx.params,
                       **{'history' : training_hx.history},
                       **{'training_time_start' : training_time_start, 'training_time_end' : training_time_end},
-                      **json.loads(model.to_json())
+                      **{'model' : json.loads(model.to_json())},
                      }
         
         return evaluation_metrics
